@@ -169,27 +169,35 @@ public class WorldManager : MonoBehaviour
         float[,,] alphamaps = tData.GetAlphamaps(0, 0, alphaRes, alphaRes);
 
         int paintBrush = 2;
+        // Calculamos el radio de la brocha circular basándonos en la diferencia de resolución
+        float brushRadius = Mathf.CeilToInt((float)alphaRes / heightRes) * 1.5f;
 
         foreach (Vector2Int pos in randomWalkGenerator.pathPositions)
         {
+            // Convertimos la coordenada del mapa de alturas al mapa de texturas
             int pX = Mathf.RoundToInt((pos.x / (float)(heightRes - 1)) * (alphaRes - 1));
             int pY = Mathf.RoundToInt((pos.y / (float)(heightRes - 1)) * (alphaRes - 1));
 
-            for (int bY = -paintBrush; bY <= paintBrush; bY++)
-            {
-                for (int bX = -paintBrush; bX <= paintBrush; bX++)
-                {
-                    int finalX = pX + bX;
-                    int finalY = pY + bY;
+            // Definimos el área cuadrada máxima a evaluar
+            int startX = Mathf.Max(0, pX - Mathf.CeilToInt(brushRadius));
+            int endX = Mathf.Min(alphaRes - 1, pX + Mathf.CeilToInt(brushRadius));
+            int startY = Mathf.Max(0, pY - Mathf.CeilToInt(brushRadius));
+            int endY = Mathf.Min(alphaRes - 1, pY + Mathf.CeilToInt(brushRadius));
 
-                    if (finalX >= 0 && finalX < alphaRes && finalY >= 0 && finalY < alphaRes)
+            for (int y = startY; y <= endY; y++)
+            {
+                for (int x = startX; x <= endX; x++)
+                {
+                    // LA MAGIA: Calculamos la distancia circular desde el centro de la brocha
+                    float distance = Vector2.Distance(new Vector2(pX, pY), new Vector2(x, y));
+
+                    // Solo pintamos si el píxel cae dentro del círculo perfecto
+                    if (distance <= brushRadius)
                     {
-                        if (Vector2.Distance(Vector2.zero, new Vector2(bX, bY)) <= paintBrush)
-                        {
-                            alphamaps[finalY, finalX, 0] = 1f; // Pinta Low Color (Camino)
-                            alphamaps[finalY, finalX, 1] = 0f; // Borra Middle Color (Terreno)
-                            alphamaps[finalY, finalX, 2] = 0f; // Borra High Color (Nieve)
-                        }
+                        // Asigna todo el peso al color de la lava (Capa 0) y borra la roca/nieve
+                        alphamaps[y, x, 0] = 1f;
+                        alphamaps[y, x, 1] = 0f;
+                        alphamaps[y, x, 2] = 0f;
                     }
                 }
             }

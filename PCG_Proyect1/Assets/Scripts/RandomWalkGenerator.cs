@@ -4,15 +4,13 @@ using UnityEngine;
 public class RandomWalkGenerator : MonoBehaviour
 {
     [Header("Parámetros del Sendero Procedural")]
-    [Tooltip("Usa un valor MUY ALTO (ej. 3000 o 5000) para que tenga tiempo de explorar todo el mapa.")]
     public int maxSteps = 3000;
-    public int pathWidth = 2; // Usa 2 para evitar el patrón cuadriculado/punteado
+    public int pathWidth = 2;
 
     [Range(0f, 0.05f)]
     public float pathDepth = 0.01f;
 
     [Header("Comportamiento Orgánico")]
-    [Tooltip("Probabilidad de girar levemente (0 a 100).")]
     [Range(0f, 100f)]
     public float directionChangeProbability = 15f;
 
@@ -21,16 +19,9 @@ public class RandomWalkGenerator : MonoBehaviour
 
     public HashSet<Vector2Int> pathPositions { get; private set; } = new HashSet<Vector2Int>();
 
-    // Las 8 direcciones posibles (N, NE, E, SE, S, SO, O, NO)
     private Vector2Int[] directions = {
-        new Vector2Int(0, 1),
-        new Vector2Int(1, 1),
-        new Vector2Int(1, 0),
-        new Vector2Int(1, -1),
-        new Vector2Int(0, -1),
-        new Vector2Int(-1, -1),
-        new Vector2Int(-1, 0),
-        new Vector2Int(-1, 1)
+        new Vector2Int(0, 1), new Vector2Int(1, 1), new Vector2Int(1, 0), new Vector2Int(1, -1),
+        new Vector2Int(0, -1), new Vector2Int(-1, -1), new Vector2Int(-1, 0), new Vector2Int(-1, 1)
     };
 
     public void CarvePath(float[,] heights)
@@ -38,37 +29,81 @@ public class RandomWalkGenerator : MonoBehaviour
         pathPositions.Clear();
         int resolution = heights.GetLength(0);
 
-        // Empezamos en un punto aleatorio del mapa, lejos de los bordes
-        Vector2Int currentPos = new Vector2Int(Random.Range(10, resolution - 10), Random.Range(10, resolution - 10));
-
-        // Empezamos apuntando en una dirección aleatoria
-        int currentDirIndex = Random.Range(0, 8);
-
-        for (int i = 0; i < maxSteps; i++)
+        if (gameObject.name == "Terreno_Volcan")
         {
-            CarveArea(heights, currentPos, resolution);
+            // LÓGICA VOLCÁN: Múltiples ríos que fluyen desde el cráter hacia afuera
+            int center = resolution / 2;
+            int numRivers = 5; // 5 lenguas de lava principales
+            int stepsPerRiver = maxSteps / numRivers;
 
-            // Inercia Direccional: El caminante gira suavemente de a 45 grados
-            if (Random.Range(0f, 100f) < directionChangeProbability)
+            for (int r = 0; r < numRivers; r++)
             {
-                int turn = (Random.value > 0.5f) ? 1 : -1;
-                currentDirIndex = (currentDirIndex + turn + 8) % 8;
+                Vector2Int currentPos = new Vector2Int(center, center);
+                int currentDirIndex = Random.Range(0, 8);
+
+                for (int i = 0; i < stepsPerRiver; i++)
+                {
+                    // Generar charcos dinámicos
+                    if (Random.Range(0f, 100f) < 3f)
+                    {
+                        int originalWidth = pathWidth;
+                        pathWidth = originalWidth * Random.Range(2, 5);
+                        CarveArea(heights, currentPos, resolution);
+                        pathWidth = originalWidth;
+                    }
+                    else
+                    {
+                        CarveArea(heights, currentPos, resolution);
+                    }
+
+                    // Inercia pesada: La lava gira menos que un caminante normal para simular flujo
+                    if (Random.Range(0f, 100f) < (directionChangeProbability * 0.4f))
+                    {
+                        int turn = (Random.value > 0.5f) ? 1 : -1;
+                        currentDirIndex = (currentDirIndex + turn + 8) % 8;
+                    }
+
+                    Vector2Int nextPos = currentPos + directions[currentDirIndex];
+
+                    // Si la lava llega al borde del mapa, se derrama y el río termina (sin rebotar)
+                    if (nextPos.x <= pathWidth + 1 || nextPos.x >= resolution - pathWidth - 2 ||
+                        nextPos.y <= pathWidth + 1 || nextPos.y >= resolution - pathWidth - 2)
+                    {
+                        break;
+                    }
+
+                    currentPos = nextPos;
+                }
             }
+        }
+        else
+        {
+            // LÓGICA NIEVE: Un solo explorador que rebota por todo el mapa
+            Vector2Int currentPos = new Vector2Int(Random.Range(10, resolution - 10), Random.Range(10, resolution - 10));
+            int currentDirIndex = Random.Range(0, 8);
 
-            Vector2Int nextPos = currentPos + directions[currentDirIndex];
-
-            // SISTEMA DE REBOTE: Si choca con los límites, NO HACEMOS BREAK. 
-            // Obligamos a la dirección a dar un giro brusco hacia el interior y saltamos el paso.
-            if (nextPos.x <= pathWidth + 1 || nextPos.x >= resolution - pathWidth - 2 ||
-                  nextPos.y <= pathWidth + 1 || nextPos.y >= resolution - pathWidth - 2)
+            for (int i = 0; i < maxSteps; i++)
             {
-                // Sumar 2 índices (+90°) o 6 índices (-90°)
-                int turnAngle = (Random.value > 0.5f) ? 2 : 6;
-                currentDirIndex = (currentDirIndex + turnAngle) % 8;
-                continue;
-            }
+                CarveArea(heights, currentPos, resolution);
 
-            currentPos = nextPos;
+                if (Random.Range(0f, 100f) < directionChangeProbability)
+                {
+                    int turn = (Random.value > 0.5f) ? 1 : -1;
+                    currentDirIndex = (currentDirIndex + turn + 8) % 8;
+                }
+
+                Vector2Int nextPos = currentPos + directions[currentDirIndex];
+
+                if (nextPos.x <= pathWidth + 1 || nextPos.x >= resolution - pathWidth - 2 ||
+                    nextPos.y <= pathWidth + 1 || nextPos.y >= resolution - pathWidth - 2)
+                {
+                    int turnAngle = (Random.value > 0.5f) ? 2 : 6;
+                    currentDirIndex = (currentDirIndex + turnAngle) % 8;
+                    continue;
+                }
+
+                currentPos = nextPos;
+            }
         }
     }
 
