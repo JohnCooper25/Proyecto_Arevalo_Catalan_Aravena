@@ -466,7 +466,6 @@ public class LSystemTreeGenerator : MonoBehaviour
             return;
         }
 
-
         GameObject branch =
             GameObject.CreatePrimitive(
                 PrimitiveType.Cylinder
@@ -500,13 +499,29 @@ public class LSystemTreeGenerator : MonoBehaviour
                 direction.normalized
             );
 
-
-        branch.transform.localScale =
-            new Vector3(
-                branchRadius,
-                length * 0.5f,
-                branchRadius
+        // ==========================================
+        // AQUÍ ESTÁ LA MAGIA PARA ROCAS VS ÁRBOLES
+        // ==========================================
+        if (GameObject.Find("Terreno_Volcan") != null)
+        {
+            // Lógica Volcán (Rocas masivas)
+            branch.transform.localScale = new Vector3(
+                branchRadius * 20f,  // MUCHO más grueso
+                length * 0.4f,       // Más cortito
+                branchRadius * 20f
             );
+        }
+        else
+        {
+            // Lógica Nieve (Árboles delgados)
+            branch.transform.localScale =
+                new Vector3(
+                    branchRadius,
+                    length * 0.5f,
+                    branchRadius
+                );
+        }
+        // ==========================================
 
 
         Renderer renderer =

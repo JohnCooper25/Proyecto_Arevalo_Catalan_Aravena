@@ -4,8 +4,8 @@ using UnityEngine;
 public class RandomWalkGenerator : MonoBehaviour
 {
     [Header("Parámetros del Sendero Procedural")]
-    public int maxSteps = 3000;
-    public int pathWidth = 2;
+    public int maxSteps = 300;
+    public int pathWidth = 0;
 
     [Range(0f, 0.05f)]
     public float pathDepth = 0.01f;
@@ -15,7 +15,12 @@ public class RandomWalkGenerator : MonoBehaviour
     public float directionChangeProbability = 15f;
 
     [Range(0f, 1f)]
-    public float flattenStrength = 0.6f;
+    public float flattenStrength = 0.3f;
+
+    [Header("Control de Montaña")]
+    [Tooltip("Altura máxima a la que el camino subirá. Ajústalo para que llegue a la ladera pero no cruce la nieve (Ej: 0.8).")]
+    [Range(0.5f, 1f)]
+    public float maxMountainHeight = 0.8f;
 
     public HashSet<Vector2Int> pathPositions { get; private set; } = new HashSet<Vector2Int>();
 
@@ -31,7 +36,6 @@ public class RandomWalkGenerator : MonoBehaviour
 
         if (gameObject.name == "Terreno_Volcan")
         {
-            // --- CONTEXTO 2: RÍOS FINOS CON CHARCO AL FINAL ---
             int center = resolution / 2;
             int numRivers = 5;
             int stepsPerRiver = maxSteps / numRivers;
@@ -41,13 +45,11 @@ public class RandomWalkGenerator : MonoBehaviour
                 Vector2Int currentPos = new Vector2Int(center, center);
                 int currentDirIndex = Random.Range(0, 8);
 
-                // 1. Dibuja el río de manera continua y delgada
                 for (int i = 0; i < stepsPerRiver; i++)
                 {
-                    // Usa el pathWidth normal (ej. 2) todo el tiempo
-                    CarveArea(heights, currentPos, resolution);
+                    CarveAreaDynamic(heights, currentPos, resolution, pathWidth);
 
-                    if (Random.Range(0f, 100f) < (directionChangeProbability * 0.4f))
+                    if (Random.Range(0f, 100f) < directionChangeProbability)
                     {
                         int turn = (Random.value > 0.5f) ? 1 : -1;
                         currentDirIndex = (currentDirIndex + turn + 8) % 8;
@@ -58,82 +60,101 @@ public class RandomWalkGenerator : MonoBehaviour
                     if (nextPos.x <= pathWidth + 1 || nextPos.x >= resolution - pathWidth - 2 ||
                         nextPos.y <= pathWidth + 1 || nextPos.y >= resolution - pathWidth - 2)
                     {
-                        break; // El río choca con el borde y se detiene
+                        break;
                     }
-
                     currentPos = nextPos;
                 }
 
-                // 2. EL CHARCO FINAL: Una vez que el ciclo for termina, inflamos la brocha en la última posición
                 int originalWidth = pathWidth;
-                pathWidth = originalWidth * Random.Range(6, 10); // Escala del lago final
-
-                CarveArea(heights, currentPos, resolution); // Dibuja la laguna
-
-                pathWidth = originalWidth; // Restaura el ancho fino para el siguiente río
+                pathWidth = originalWidth * Random.Range(6, 10);
+                CarveAreaDynamic(heights, currentPos, resolution, pathWidth);
+                pathWidth = originalWidth;
             }
         }
         else
         {
-            // --- CONTEXTO 1: EXPLORACIÓN NEVADA Y ZONAS DE DESCANSO ---
-            Vector2Int currentPos = new Vector2Int(Random.Range(10, resolution - 10), Random.Range(10, resolution - 10));
-            int currentDirIndex = Random.Range(0, 8);
+            // LÓGICA DE BOSQUE/NIEVE
+            int numberOfPaths = 5;
+            HashSet<Vector2Int> globalVisited = new HashSet<Vector2Int>();
 
-            for (int i = 0; i < maxSteps; i++)
+            for (int p = 0; p < numberOfPaths; p++)
             {
-                float currentHeight = heights[currentPos.y, currentPos.x];
+                Vector2Int currentPos = Vector2Int.zero;
+                int currentDirIndex = 0;
 
-                if (currentHeight < 0.45f && Random.Range(0f, 100f) < 2f)
+                if (p == 0) { currentPos = new Vector2Int(Random.Range(10, resolution - 10), 3); currentDirIndex = 0; }
+                else if (p == 1) { currentPos = new Vector2Int(Random.Range(10, resolution - 10), resolution - 4); currentDirIndex = 4; }
+                else if (p == 2) { currentPos = new Vector2Int(3, Random.Range(10, resolution - 10)); currentDirIndex = 2; }
+                else { currentPos = new Vector2Int(resolution - 4, Random.Range(10, resolution - 10)); currentDirIndex = 6; }
+
+                if (heights[currentPos.y, currentPos.x] > maxMountainHeight) continue;
+
+                for (int i = 0; i < maxSteps; i++)
                 {
-                    int originalWidth = pathWidth;
-                    pathWidth = originalWidth * Random.Range(4, 7);
-                    CarveArea(heights, currentPos, resolution);
-                    pathWidth = originalWidth;
-                }
-                else
-                {
-                    CarveArea(heights, currentPos, resolution);
-                }
+                    globalVisited.Add(currentPos);
+                    CarveAreaDynamic(heights, currentPos, resolution, pathWidth);
 
-                if (Random.Range(0f, 100f) < directionChangeProbability)
-                {
-                    int turn = (Random.value > 0.5f) ? 1 : -1;
-                    currentDirIndex = (currentDirIndex + turn + 8) % 8;
+                    if (Random.Range(0f, 100f) < directionChangeProbability)
+                    {
+                        int turn = (Random.value > 0.5f) ? 1 : -1;
+                        currentDirIndex = (currentDirIndex + turn + 8) % 8;
+                    }
+
+                    Vector2Int nextPos = currentPos + directions[currentDirIndex];
+
+                    // Detiene el camino si choca con los límites de altura o con su propio rastro
+                    if (nextPos.x <= 2 || nextPos.x >= resolution - 3 ||
+                        nextPos.y <= 2 || nextPos.y >= resolution - 3 ||
+                        heights[nextPos.y, nextPos.x] > maxMountainHeight ||
+                        globalVisited.Contains(nextPos))
+                    {
+                        // Intenta esquivar la montaña bordeándola en lugar de rendirse de inmediato
+                        bool found = false;
+                        for (int offset = 1; offset <= 2; offset++)
+                        {
+                            int dir1 = (currentDirIndex + offset) % 8;
+                            Vector2Int p1 = currentPos + directions[dir1];
+                            if (p1.x > 2 && p1.x < resolution - 3 && p1.y > 2 && p1.y < resolution - 3 &&
+                                heights[p1.y, p1.x] <= maxMountainHeight && !globalVisited.Contains(p1))
+                            {
+                                currentDirIndex = dir1; found = true; break;
+                            }
+
+                            int dir2 = (currentDirIndex - offset + 8) % 8;
+                            Vector2Int p2 = currentPos + directions[dir2];
+                            if (p2.x > 2 && p2.x < resolution - 3 && p2.y > 2 && p2.y < resolution - 3 &&
+                                heights[p2.y, p2.x] <= maxMountainHeight && !globalVisited.Contains(p2))
+                            {
+                                currentDirIndex = dir2; found = true; break;
+                            }
+                        }
+                        if (!found) break;
+                    }
+                    else
+                    {
+                        currentPos = nextPos;
+                    }
                 }
-
-                Vector2Int nextPos = currentPos + directions[currentDirIndex];
-
-                if (nextPos.x <= pathWidth + 1 || nextPos.x >= resolution - pathWidth - 2 ||
-                    nextPos.y <= pathWidth + 1 || nextPos.y >= resolution - pathWidth - 2)
-                {
-                    int turnAngle = (Random.value > 0.5f) ? 2 : 6;
-                    currentDirIndex = (currentDirIndex + turnAngle) % 8;
-                    continue;
-                }
-
-                currentPos = nextPos;
             }
         }
     }
-    private void CarveArea(float[,] heights, Vector2Int center, int resolution)
+
+    private void CarveAreaDynamic(float[,] heights, Vector2Int center, int resolution, int width)
     {
         float centerHeight = heights[center.y, center.x] - pathDepth;
 
-        for (int x = center.x - pathWidth; x <= center.x + pathWidth; x++)
+        for (int x = center.x - width; x <= center.x + width; x++)
         {
-            for (int y = center.y - pathWidth; y <= center.y + pathWidth; y++)
-            {
+            for (int y = center.y - width; y <= center.y + width; y++)
+            {   
                 if (x >= 0 && x < resolution && y >= 0 && y < resolution)
                 {
-                    // Evaluamos la distancia PRIMERO
                     float distance = Vector2.Distance(new Vector2(center.x, center.y), new Vector2(x, y));
-
-                    if (distance <= pathWidth)
+                    if (distance <= width)
                     {
-                        // SOLUCIÓN: Solo agregamos el punto al camino de color SI pertenece al círculo
                         pathPositions.Add(new Vector2Int(x, y));
 
-                        float falloff = 1f - (distance / (float)Mathf.Max(1, pathWidth));
+                        float falloff = 1f - (distance / (float)Mathf.Max(1, width));
                         falloff = Mathf.SmoothStep(0f, 1f, falloff);
 
                         float targetHeight = heights[y, x] - (pathDepth * falloff);

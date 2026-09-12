@@ -249,7 +249,7 @@ public class TerrainGenerator : MonoBehaviour
         generatedTerrain.terrainData.SetHeights(0, 0, heights);
     }
 
-    private void ApplyHeightColors(float[,] heights)
+   private void ApplyHeightColors(float[,] heights)
     {
         TerrainData terrainData = generatedTerrain.terrainData;
         EnsureHeightLayers();
@@ -265,6 +265,9 @@ public class TerrainGenerator : MonoBehaviour
         float[,,] alphamaps = new float[ALPHAMAP_RESOLUTION, ALPHAMAP_RESOLUTION, 3];
         int heightResolution = heights.GetLength(0);
 
+        // Identificamos si este terreno es el volcán
+        bool isVolcano = gameObject.name == "Terreno_Volcan";
+
         for (int y = 0; y < ALPHAMAP_RESOLUTION; y++)
         {
             for (int x = 0; x < ALPHAMAP_RESOLUTION; x++)
@@ -274,14 +277,32 @@ public class TerrainGenerator : MonoBehaviour
 
                 float height = heights[heightY, heightX];
 
-                // El índice 0 (Low Color) se deja vacío para el camino.
-                if (height < highThreshold)
+                if (isVolcano)
                 {
-                    alphamaps[y, x, 1] = 1f; // Índice 1: Middle Color (Terreno)
+                    // El volcán solo usa la textura base (ej. roca/tierra quemada).
+                    // El RandomWalkGenerator se encarga de pintar la lava después en la capa 0.
+                    alphamaps[y, x, 1] = 1f; 
                 }
                 else
                 {
-                    alphamaps[y, x, 2] = 1f; // Índice 2: High Color (Nieve)
+                    // --- TERRENO NORMAL (NIEVE NATURAL) ---
+                    
+                    // 1. Calculamos la inclinación actual del polígono (steepness)
+                    float normX = x / (float)(ALPHAMAP_RESOLUTION - 1);
+                    float normY = y / (float)(ALPHAMAP_RESOLUTION - 1);
+                    float steepness = terrainData.GetSteepness(normX, normY);
+
+                    // 2. Transición suave de altura en lugar de un corte brusco (blending)
+                    float blendRange = 0.08f; // Suavidad de la línea de nieve
+                    float snowWeight = Mathf.InverseLerp(highThreshold - blendRange, highThreshold + blendRange, height);
+
+                    // 3. La nieve resbala de paredes empinadas (más de 35-50 grados revela la capa intermedia)
+                    float slopeBlend = Mathf.InverseLerp(50f, 35f, steepness); 
+                    snowWeight *= slopeBlend; // Si es muy inclinado, el peso de la nieve baja a 0
+
+                    // Asignamos los colores
+                    alphamaps[y, x, 1] = 1f - snowWeight; // Índice 1: Middle Color (Terreno/Roca)
+                    alphamaps[y, x, 2] = snowWeight;      // Índice 2: High Color (Nieve)
                 }
             }
         }
