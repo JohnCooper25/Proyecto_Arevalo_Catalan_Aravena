@@ -31,9 +31,9 @@ public class RandomWalkGenerator : MonoBehaviour
 
         if (gameObject.name == "Terreno_Volcan")
         {
-            // LÓGICA VOLCÁN: Múltiples ríos que fluyen desde el cráter hacia afuera
+            // --- CONTEXTO 2: RÍOS FINOS CON CHARCO AL FINAL ---
             int center = resolution / 2;
-            int numRivers = 5; // 5 lenguas de lava principales
+            int numRivers = 5;
             int stepsPerRiver = maxSteps / numRivers;
 
             for (int r = 0; r < numRivers; r++)
@@ -41,22 +41,12 @@ public class RandomWalkGenerator : MonoBehaviour
                 Vector2Int currentPos = new Vector2Int(center, center);
                 int currentDirIndex = Random.Range(0, 8);
 
+                // 1. Dibuja el río de manera continua y delgada
                 for (int i = 0; i < stepsPerRiver; i++)
                 {
-                    // Generar charcos dinámicos
-                    if (Random.Range(0f, 100f) < 3f)
-                    {
-                        int originalWidth = pathWidth;
-                        pathWidth = originalWidth * Random.Range(2, 5);
-                        CarveArea(heights, currentPos, resolution);
-                        pathWidth = originalWidth;
-                    }
-                    else
-                    {
-                        CarveArea(heights, currentPos, resolution);
-                    }
+                    // Usa el pathWidth normal (ej. 2) todo el tiempo
+                    CarveArea(heights, currentPos, resolution);
 
-                    // Inercia pesada: La lava gira menos que un caminante normal para simular flujo
                     if (Random.Range(0f, 100f) < (directionChangeProbability * 0.4f))
                     {
                         int turn = (Random.value > 0.5f) ? 1 : -1;
@@ -65,26 +55,45 @@ public class RandomWalkGenerator : MonoBehaviour
 
                     Vector2Int nextPos = currentPos + directions[currentDirIndex];
 
-                    // Si la lava llega al borde del mapa, se derrama y el río termina (sin rebotar)
                     if (nextPos.x <= pathWidth + 1 || nextPos.x >= resolution - pathWidth - 2 ||
                         nextPos.y <= pathWidth + 1 || nextPos.y >= resolution - pathWidth - 2)
                     {
-                        break;
+                        break; // El río choca con el borde y se detiene
                     }
 
                     currentPos = nextPos;
                 }
+
+                // 2. EL CHARCO FINAL: Una vez que el ciclo for termina, inflamos la brocha en la última posición
+                int originalWidth = pathWidth;
+                pathWidth = originalWidth * Random.Range(6, 10); // Escala del lago final
+
+                CarveArea(heights, currentPos, resolution); // Dibuja la laguna
+
+                pathWidth = originalWidth; // Restaura el ancho fino para el siguiente río
             }
         }
         else
         {
-            // LÓGICA NIEVE: Un solo explorador que rebota por todo el mapa
+            // --- CONTEXTO 1: EXPLORACIÓN NEVADA Y ZONAS DE DESCANSO ---
             Vector2Int currentPos = new Vector2Int(Random.Range(10, resolution - 10), Random.Range(10, resolution - 10));
             int currentDirIndex = Random.Range(0, 8);
 
             for (int i = 0; i < maxSteps; i++)
             {
-                CarveArea(heights, currentPos, resolution);
+                float currentHeight = heights[currentPos.y, currentPos.x];
+
+                if (currentHeight < 0.45f && Random.Range(0f, 100f) < 2f)
+                {
+                    int originalWidth = pathWidth;
+                    pathWidth = originalWidth * Random.Range(4, 7);
+                    CarveArea(heights, currentPos, resolution);
+                    pathWidth = originalWidth;
+                }
+                else
+                {
+                    CarveArea(heights, currentPos, resolution);
+                }
 
                 if (Random.Range(0f, 100f) < directionChangeProbability)
                 {
@@ -106,7 +115,6 @@ public class RandomWalkGenerator : MonoBehaviour
             }
         }
     }
-
     private void CarveArea(float[,] heights, Vector2Int center, int resolution)
     {
         float centerHeight = heights[center.y, center.x] - pathDepth;
@@ -117,12 +125,14 @@ public class RandomWalkGenerator : MonoBehaviour
             {
                 if (x >= 0 && x < resolution && y >= 0 && y < resolution)
                 {
-                    Vector2Int pos = new Vector2Int(x, y);
-                    pathPositions.Add(pos);
-
+                    // Evaluamos la distancia PRIMERO
                     float distance = Vector2.Distance(new Vector2(center.x, center.y), new Vector2(x, y));
+
                     if (distance <= pathWidth)
                     {
+                        // SOLUCIÓN: Solo agregamos el punto al camino de color SI pertenece al círculo
+                        pathPositions.Add(new Vector2Int(x, y));
+
                         float falloff = 1f - (distance / (float)Mathf.Max(1, pathWidth));
                         falloff = Mathf.SmoothStep(0f, 1f, falloff);
 
