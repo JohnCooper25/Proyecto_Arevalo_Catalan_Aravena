@@ -149,6 +149,24 @@ public class TerrainGenerator : MonoBehaviour
             return;
         }
 
+        // En lugar de usar la variable booleana, revisamos el nombre del objeto
+        if (gameObject.name == "Terreno_Volcan")
+        {
+            int res = heights.GetLength(0);
+            float center = res / 2f;
+
+            for (int y = 0; y < res; y++)
+            {
+                for (int x = 0; x < res; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(center, center)) / center;
+                    float mountainShape = Mathf.Pow(Mathf.Clamp01(1f - (dist * 2.5f)), 2f);
+
+                    heights[y, x] = Mathf.Clamp01((heights[y, x] * 0.7f) + (mountainShape * 0.8f));
+                }
+            }
+        }
+
         ApplyHeightmap(heights);
 
         if (paintByHeight)

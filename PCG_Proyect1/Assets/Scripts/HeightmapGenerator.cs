@@ -3,6 +3,8 @@ using UnityEngine;
 
 public static class HeightmapGenerator
 {
+    
+
     public enum InterpolationMode
     {
         None,
