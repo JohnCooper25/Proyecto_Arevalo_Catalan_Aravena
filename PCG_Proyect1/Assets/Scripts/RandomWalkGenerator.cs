@@ -5,6 +5,7 @@ public class RandomWalkGenerator : MonoBehaviour
 {
     [Header("Parámetros del Sendero Procedural")]
     public int maxSteps = 300;
+    public int numberOfPaths = 5; 
     public int pathWidth = 0;
 
     [Range(0f, 0.05f)]
@@ -37,7 +38,7 @@ public class RandomWalkGenerator : MonoBehaviour
         if (gameObject.name == "Terreno_Volcan")
         {
             int center = resolution / 2;
-            int numRivers = 5;
+            int numRivers = numberOfPaths; 
             int stepsPerRiver = maxSteps / numRivers;
 
             for (int r = 0; r < numRivers; r++)
@@ -74,7 +75,7 @@ public class RandomWalkGenerator : MonoBehaviour
         else
         {
             // LÓGICA DE BOSQUE/NIEVE
-            int numberOfPaths = 5;
+           
             HashSet<Vector2Int> globalVisited = new HashSet<Vector2Int>();
 
             for (int p = 0; p < numberOfPaths; p++)

@@ -39,7 +39,7 @@ public class TerrainGenerator : MonoBehaviour
     private const float TERRAIN_HEIGHT = 20f;
 
     [Tooltip("Semilla utilizada por el generador pseudoaleatorio. Los mismos parámetros y la misma semilla producen el mismo resultado.")]
-    [SerializeField] private int seed = 12345;
+    [SerializeField] public int seed = 12345;
 
     [Tooltip("Método utilizado para combinar los valores de los puntos de control en Value Noise.")]
     [SerializeField] private HeightmapGenerator.InterpolationMode valueNoiseInterpolation =
@@ -58,15 +58,15 @@ public class TerrainGenerator : MonoBehaviour
 
     [Tooltip("Cantidad de subdivisiones realizadas por Diamond-Square. También determina la resolución final mediante 2^iterations + 1.")]
     [Range(5, 9)]
-    [SerializeField] private int diamondIterations = 7;
+    [SerializeField] public int diamondIterations = 7;
 
     [Tooltip("Magnitud inicial de la perturbación aleatoria añadida durante los pasos Diamond y Square.")]
     [Range(0.01f, 1f)]
-    [SerializeField] private float diamondRoughness = 0.4f;
+    [SerializeField] public float diamondRoughness = 0.4f;
 
     [Tooltip("Factor aplicado a Roughness después de cada iteración. Valores altos conservan más irregularidad en las escalas pequeñas.")]
     [Range(0.1f, 1f)]
-    [SerializeField] private float diamondRoughnessDecay = 0.5f;
+    [SerializeField] public  float diamondRoughnessDecay = 0.5f;
 
     [Tooltip("Colorea el terreno utilizando bandas definidas según la altura normalizada. Solo afecta la visualización.")]
     [SerializeField] private bool paintByHeight = true;
